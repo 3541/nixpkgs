@@ -15,6 +15,8 @@ assertExecutable() {
 #                          (if unset or empty, defaults to EXECUTABLE)
 # --inherit-argv0        : the executable inherits argv0 from the wrapper.
 #                          (use instead of --argv0 '$0')
+# --inherit-argv0-path   : set the name of the executed process to the full path
+#                          to the wrapper.
 # --set          VAR VAL : add VAR with value VAL to the executable's environment
 # --set-default  VAR VAL : like --set, but only adds VAR if not already set in
 #                          the environment
@@ -177,6 +179,8 @@ makeShellWrapper() {
         elif [[ "$p" == "--inherit-argv0" ]]; then
             # Whichever comes last of --argv0 and --inherit-argv0 wins
             argv0='$0'
+        elif [[ "$p" == "--inherit-argv0-path" ]]; then
+            argv0='$(which "$0")'
         else
             die "makeWrapper doesn't understand the arg $p"
         fi

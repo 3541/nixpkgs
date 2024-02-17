@@ -19,6 +19,8 @@ assertExecutable() {
 #                          (if unset or empty, defaults to EXECUTABLE)
 # --inherit-argv0        : the executable inherits argv0 from the wrapper.
 #                          (use instead of --argv0 '$0')
+# --inherit-argv0-path   : set the name of the executed process to the full path
+#                          to the wrapper.
 # --set          VAR VAL : add VAR with value VAL to the executable's environment
 # --set-default  VAR VAL : like --set, but only adds VAR if not already set in
 #                          the environment
@@ -87,6 +89,7 @@ makeDocumentedCWrapper() {
 makeCWrapper() {
     local argv0 inherit_argv0 n params cmd main flagsBefore flagsAfter flags executable length
     local uses_prefix uses_suffix uses_assert uses_assert_success uses_stdio uses_asprintf
+    local inherit_argv0_path
     executable=$(escapeStringLiteral "$1")
     params=("$@")
     length=${#params[*]}
@@ -169,6 +172,11 @@ makeCWrapper() {
                 # Whichever comes last of --argv0 and --inherit-argv0 wins
                 inherit_argv0=1
             ;;
+            --inherit-argv0-path)
+                inherit_argv0=1
+                inherit_argv0_path=1
+                uses_stdio=1
+            ;;
             *) # Using an error macro, we will make sure the compiler gives an understandable error message
                 main="$main#error makeCWrapper: Unknown argument ${p}"$'\n'
             ;;
@@ -176,16 +184,19 @@ makeCWrapper() {
     done
     [[ -z "$flagsBefore" && -z "$flagsAfter" ]] || main="$main"${main:+$'\n'}$(addFlags "$flagsBefore" "$flagsAfter")$'\n'$'\n'
     [ -z "$inherit_argv0" ] && main="${main}argv[0] = \"${argv0:-${executable}}\";"$'\n'
+    [[ -n "$inherit_argv0" && -n "$inherit_argv0_path" ]] && main="${main}argv[0] = resolve_path(argv[0]);"$'\n'
     main="${main}return execv(\"${executable}\", argv);"$'\n'
 
-    [ -z "$uses_asprintf" ] || printf '%s\n' "#define _GNU_SOURCE         /* See feature_test_macros(7) */"
+    [[ -z "$uses_asprintf" && -z "$inherit_argv0_path" ]] || printf '%s\n' "#define _GNU_SOURCE         /* See feature_test_macros(7) */"
     printf '%s\n' "#include <unistd.h>"
     printf '%s\n' "#include <stdlib.h>"
     [ -z "$uses_assert" ]   || printf '%s\n' "#include <assert.h>"
     [ -z "$uses_stdio" ]    || printf '%s\n' "#include <stdio.h>"
+    [ -z "$inherit_argv0_path" ] || printf '%s\n' "$(resolvePathInclude)"
     [ -z "$uses_assert_success" ] || printf '\n%s\n' "#define assert_success(e) do { if ((e) < 0) { perror(#e); abort(); } } while (0)"
     [ -z "$uses_prefix" ] || printf '\n%s\n' "$(setEnvPrefixFn)"
     [ -z "$uses_suffix" ] || printf '\n%s\n' "$(setEnvSuffixFn)"
+    [ -z "$inherit_argv0_path" ] || printf '\n%s\n' "$(resolvePathFn)"
     printf '\n%s' "int main(int argc, char **argv) {"
     printf '\n%s' "$(indent4 "$main")"
     printf '\n%s\n' "}"
@@ -334,6 +345,66 @@ void set_env_suffix(char *env, char *sep, char *suffix) {
     } else {
         assert_success(setenv(env, suffix, 1));
     }
+}
+"
+}
+
+resolvePathInclude() {
+    printf '%s' "\
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#else
+#include <fcntl.h>
+#include <sys/stat.h>
+#endif
+"
+}
+
+resolvePathFn() {
+    printf '%s' "\
+char* resolve_path(char* b) {
+    if (b[0] == '/' || access(b, R_OK | X_OK) == 0)
+        return b;
+
+#ifdef __APPLE__
+    unsigned len = 0;
+    _NSGetExecutablePath(NULL, &len);
+    char* buf = calloc(1, len);
+    if (!buf)
+        return b;
+
+    return _NSGetExecutablePath(buf, &len) == 0 ? buf : b;
+#else
+    int fd = open(\"/proc/self/exe\", O_PATH | O_NOFOLLOW);
+    if (fd < 0) {
+        perror(\"open(/proc/self/exe)\");
+        return b;
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        perror(\"fstat(/proc/self/exe)\");
+        close(fd);
+        return b;
+    }
+
+    char* buf = calloc(1, st.st_size + 1);
+    if (!buf) {
+        close(fd);
+        return b;
+    }
+
+    ssize_t res = readlinkat(fd, \"\", buf, st.st_size + 1);
+    if (res != st.st_size) {
+        if (res < 0)
+            perror(\"readlinkat(/proc/self/exe)\");
+        free(buf);
+        close(fd);
+        return b;
+    }
+
+    return buf;
+#endif
 }
 "
 }
