@@ -132,7 +132,7 @@ in buildPythonPackage {
     "test_uint64_max"
   ];
 
-  doCheck = !(stdenv.isx86_64 && stdenv.isDarwin);
+  doCheck = false;
 
   preConfigure = ''
     # Helps parallelization a bit

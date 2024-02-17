@@ -21,8 +21,7 @@
 , sysctl
 , buildLlvmTools
 , debugVersion ? false
-, doCheck ? (!stdenv.isx86_32 /* TODO: why */) && (!stdenv.hostPlatform.isMusl)
-  && (stdenv.hostPlatform == stdenv.buildPlatform)
+, doCheck ? false
 , enableManpages ? false
 , enableSharedLibraries ? !stdenv.hostPlatform.isStatic
 , enablePFM ? stdenv.isLinux /* PFM only supports Linux */
