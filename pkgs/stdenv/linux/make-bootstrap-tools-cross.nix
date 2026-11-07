@@ -38,6 +38,7 @@ lib.mapAttrs (n: make) (
     riscv64-unknown-linux-gnu = riscv64;
     s390x-unknown-linux-gnu = s390x;
     loongarch64-unknown-linux-gnu = loongarch64-linux;
+    "hppa2.0-unknown-linux-gnu" = parisc-linux;
 
     # musl
     aarch64-unknown-linux-musl = aarch64-multiplatform-musl;

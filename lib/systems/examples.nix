@@ -241,6 +241,10 @@ rec {
     config = "s390x-unknown-linux-gnu";
   };
 
+  parisc = {
+    config = "hppa2.0-unknown-linux-gnu";
+  };
+
   arm-embedded = {
     config = "arm-none-eabi";
   };

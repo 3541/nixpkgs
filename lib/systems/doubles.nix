@@ -63,6 +63,7 @@ let
     "riscv64-linux"
     "s390-linux"
     "s390x-linux"
+    "parisc-linux"
 
     # MMIXware
     "mmix-mmixware"

@@ -408,6 +408,12 @@ rec {
         significantByte = littleEndian;
         family = "javascript";
       };
+
+      parisc = {
+        bits = 32;
+	significantByte = bigEndian;
+	family = "parisc";
+      };
     }
     // {
       # aliases
